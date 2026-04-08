@@ -87,6 +87,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      temporal:
+        condition: service_started
     networks:
       - postiz-network
       - temporal-network
@@ -115,7 +117,7 @@ services:
     restart: always
     environment:
       MB_DB_TYPE: postgres
-      MB_DB_DBNAME: ${POSTGRES_DB}
+      MB_DB_DBNAME: metabase
       MB_DB_PORT: 5432
       MB_DB_USER: ${POSTGRES_USER}
       MB_DB_PASS: ${POSTGRES_PASSWORD}
