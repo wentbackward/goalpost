@@ -1,7 +1,7 @@
 # Social Media Analytics Platform — Claude Code Spec
 
 **Project:** `social-analytics`  
-**Author:** Paul Gresham Advisory LLC  
+**Author:** Your Organization  
 **Status:** Draft for implementation  
 
 ---
@@ -489,4 +489,4 @@ Claude Code should verify the following before considering the implementation co
 ---
 
 *Spec version: 1.0 — April 2026*  
-*© 2026 Paul Gresham Advisory LLC*
+*© 2026 Your Organization*

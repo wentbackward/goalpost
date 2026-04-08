@@ -4,13 +4,18 @@ and discovers the Instagram Business Account ID.
 """
 
 import http.server
+import os
 import urllib.parse
 import urllib.request
 import json
 import sys
 
-APP_ID = "4463929710561318"
-APP_SECRET = "be14a8143b2525062a01cc9ad0e05d76"
+APP_ID = os.environ.get("META_APP_ID", "")
+APP_SECRET = os.environ.get("META_APP_SECRET", "")
+
+if not APP_ID or not APP_SECRET:
+    print("Set META_APP_ID and META_APP_SECRET environment variables")
+    sys.exit(1)
 REDIRECT_URI = "http://localhost:9090/callback"
 SCOPES = "pages_show_list,pages_read_engagement,pages_read_user_content"
 

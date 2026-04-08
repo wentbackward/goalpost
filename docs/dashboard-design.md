@@ -1,6 +1,6 @@
 # Social Analytics Dashboard — Design Document
 
-**Project:** Goalpost — Paul Gresham Advisory LLC  
+**Project:** Goalpost — Your Organization  
 **Version:** 1.0  
 **Date:** April 2026  
 **Status:** Ready for Implementation
@@ -9,7 +9,7 @@
 
 ## 1. Overview
 
-This document specifies the frontend dashboard for the Goalpost social analytics platform. The backend is a FastAPI collector running at `fragola:8060` that aggregates post metrics across X/Twitter, LinkedIn, Instagram, Facebook, and YouTube. The dashboard is a read-mostly client that renders that data; it does not write to any social platform.
+This document specifies the frontend dashboard for the Goalpost social analytics platform. The backend is a FastAPI collector (default port 8060) that aggregates post metrics across X/Twitter, LinkedIn, Instagram, Facebook, and YouTube. The dashboard is a read-mostly client that renders that data; it does not write to any social platform.
 
 ---
 
@@ -52,7 +52,7 @@ dashboard/
 │   ├── posts/page.tsx
 │   ├── posts/[id]/page.tsx
 │   └── api/
-│       └── collector/[...path]/route.ts  # proxy to fragola:8060
+│       └── collector/[...path]/route.ts  # proxy to localhost:8060
 ├── components/
 │   ├── layout/
 │   │   ├── Sidebar.tsx
@@ -428,7 +428,7 @@ export function fmtWatchTime(ms: number): string { ... }
 
 ```bash
 # dashboard/.env.local
-COLLECTOR_BASE_URL=http://fragola:8060   # server-side only
+COLLECTOR_BASE_URL=http://localhost:8060   # server-side only
 COLLECTOR_API_KEY=changeme_collector_key  # server-side only — never in browser
 ```
 
@@ -473,4 +473,4 @@ COLLECTOR_API_KEY=changeme_collector_key  # server-side only — never in browse
 ---
 
 *Design document version 1.0 — April 2026*  
-*© 2026 Paul Gresham Advisory LLC*
+*© 2026 Your Organization*
