@@ -1,6 +1,6 @@
 # Social Analytics Dashboard — Design Document
 
-**Project:** Goalpost — Your Organization  
+**Project:** Goalpost — Paul Gresham Advisory LLC  
 **Version:** 1.0  
 **Date:** April 2026  
 **Status:** Ready for Implementation
@@ -473,4 +473,4 @@ COLLECTOR_API_KEY=changeme_collector_key  # server-side only — never in browse
 ---
 
 *Design document version 1.0 — April 2026*  
-*© 2026 Your Organization*
+*© 2026 Paul Gresham Advisory LLC*
