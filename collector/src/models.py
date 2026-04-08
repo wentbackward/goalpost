@@ -26,6 +26,7 @@ class Post(Base):
     platform: Mapped[str] = mapped_column()
     platform_post_id: Mapped[str] = mapped_column()
     content_text: Mapped[str | None] = mapped_column(Text)
+    media_url: Mapped[str | None] = mapped_column(Text)
     media_type: Mapped[str | None] = mapped_column()
     published_at: Mapped[datetime | None] = mapped_column(TZDateTime)
     created_at: Mapped[datetime] = mapped_column(
@@ -37,6 +38,26 @@ class Post(Base):
     )
 
     metrics: Mapped[list["PostMetric"]] = relationship(back_populates="post")
+    hashtags: Mapped[list["PostHashtag"]] = relationship(back_populates="post")
+
+
+class PostHashtag(Base):
+    __tablename__ = "post_hashtags"
+    __table_args__ = (
+        Index("ix_post_hashtags_hashtag", "hashtag"),
+        UniqueConstraint("post_id", "hashtag", name="uq_post_hashtag"),
+        {"schema": "analytics"},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()")
+    )
+    post_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("analytics.posts.id", ondelete="CASCADE")
+    )
+    hashtag: Mapped[str] = mapped_column()
+
+    post: Mapped["Post"] = relationship(back_populates="hashtags")
 
 
 class PostMetric(Base):

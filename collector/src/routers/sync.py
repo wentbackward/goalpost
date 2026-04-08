@@ -40,6 +40,17 @@ async def _run_sync(sync_id: uuid.UUID, platforms: list[str] | None):
         except Exception as exc:
             logger.warning("sync.postiz_bridge_failed", service="collector", sync_id=str(sync_id), error=str(exc))
 
+        # Parse hashtags for all posts that don't have any yet
+        try:
+            from ..hashtags import sync_post_hashtags
+            all_posts_stmt = select(Post)
+            all_posts = (await session.execute(all_posts_stmt)).scalars().all()
+            for p in all_posts:
+                await sync_post_hashtags(session, p)
+            await session.commit()
+        except Exception as exc:
+            logger.warning("sync.hashtag_parse_failed", service="collector", sync_id=str(sync_id), error=str(exc))
+
         providers = await get_configured_providers()
         if platforms:
             providers = [p for p in providers if p.platform in platforms]

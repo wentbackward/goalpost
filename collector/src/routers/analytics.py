@@ -9,9 +9,12 @@ from sqlalchemy.orm import selectinload
 
 from ..auth import require_api_key
 from ..database import get_session
-from ..models import Post, PostMetric
+from ..hashtags import sync_post_hashtags
+from ..models import Post, PostHashtag, PostMetric
 from ..schemas import (
     AnalyticsSummaryResponse,
+    HashtagAnalyticsResponse,
+    HashtagTotals,
     MetricSnapshot,
     PlatformTotals,
     PostListResponse,
@@ -29,16 +32,19 @@ def _post_to_response(post: Post, latest_metric: PostMetric | None = None) -> Po
     latest = None
     if latest_metric:
         latest = MetricSnapshot.model_validate(latest_metric)
+    hashtag_list = [h.hashtag for h in post.hashtags] if post.hashtags else []
     return PostResponse(
         id=post.id,
         postiz_post_id=post.postiz_post_id,
         platform=post.platform,
         platform_post_id=post.platform_post_id,
         content_text=post.content_text,
+        media_url=post.media_url,
         media_type=post.media_type,
         published_at=post.published_at,
         created_at=post.created_at,
         updated_at=post.updated_at,
+        hashtags=hashtag_list,
         latest_metrics=latest,
     )
 
@@ -53,10 +59,14 @@ async def register_post(
         platform=body.platform,
         platform_post_id=body.platform_post_id,
         content_text=body.content_text,
+        media_url=body.media_url,
         media_type=body.media_type,
         published_at=body.published_at,
     )
     session.add(post)
+    await session.commit()
+    await session.refresh(post)
+    await sync_post_hashtags(session, post)
     await session.commit()
     await session.refresh(post)
     return _post_to_response(post)
@@ -91,6 +101,7 @@ async def list_posts(
     stmt = (
         select(Post)
         .where(where)
+        .options(selectinload(Post.hashtags))
         .order_by(desc(Post.published_at))
         .limit(limit)
         .offset(offset)
@@ -119,7 +130,8 @@ async def get_post_metrics(
     session: AsyncSession = Depends(get_session),
     _: str = Depends(require_api_key),
 ):
-    post = await session.get(Post, post_id)
+    stmt = select(Post).where(Post.id == post_id).options(selectinload(Post.hashtags))
+    post = (await session.execute(stmt)).scalar_one_or_none()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
@@ -160,7 +172,7 @@ async def analytics_summary(
         post_conditions.append(Post.published_at <= end_date)
 
     post_where = and_(*post_conditions) if post_conditions else True
-    posts_stmt = select(Post).where(post_where)
+    posts_stmt = select(Post).where(post_where).options(selectinload(Post.hashtags))
     posts_result = await session.execute(posts_stmt)
     posts = posts_result.scalars().all()
 
@@ -233,4 +245,84 @@ async def analytics_summary(
         by_platform=by_platform,
         by_media_type=by_media_type,
         top_posts=top_posts,
+    )
+
+
+@router.get("/analytics/hashtags", response_model=HashtagAnalyticsResponse)
+async def hashtag_analytics(
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    platform: str | None = None,
+    limit: int = Query(default=25, le=100),
+    session: AsyncSession = Depends(get_session),
+    _: str = Depends(require_api_key),
+):
+    """Aggregate metrics grouped by hashtag."""
+    # Get all posts with hashtags, filtered
+    post_conditions = []
+    if platform:
+        post_conditions.append(Post.platform == platform)
+    if start_date:
+        post_conditions.append(Post.published_at >= start_date)
+    if end_date:
+        post_conditions.append(Post.published_at <= end_date)
+
+    post_where = and_(*post_conditions) if post_conditions else True
+    stmt = (
+        select(Post)
+        .where(post_where)
+        .options(selectinload(Post.hashtags))
+    )
+    posts = (await session.execute(stmt)).scalars().all()
+
+    # Build per-hashtag aggregates
+    hashtag_data: dict[str, HashtagTotals] = {}
+
+    for post in posts:
+        if not post.hashtags:
+            continue
+
+        # Get latest metric for this post
+        metric_stmt = (
+            select(PostMetric)
+            .where(PostMetric.post_id == post.id)
+            .order_by(desc(PostMetric.synced_at))
+            .limit(1)
+        )
+        metric = (await session.execute(metric_stmt)).scalar_one_or_none()
+
+        for ht in post.hashtags:
+            tag = ht.hashtag
+            if tag not in hashtag_data:
+                hashtag_data[tag] = HashtagTotals(hashtag=tag)
+            h = hashtag_data[tag]
+            h.posts += 1
+            if metric:
+                h.impressions += metric.impressions or 0
+                h.reach += metric.reach or 0
+                h.likes += metric.likes or 0
+                h.comments += metric.comments or 0
+                h.shares += metric.shares or 0
+                h.video_views += metric.video_views or 0
+
+    # Compute engagement rates
+    for h in hashtag_data.values():
+        denom = h.impressions or h.reach
+        if denom > 0:
+            engagement = h.likes + h.comments + h.shares
+            h.engagement_rate = round(engagement / denom, 6)
+
+    # Sort by total engagement descending
+    sorted_hashtags = sorted(
+        hashtag_data.values(),
+        key=lambda h: h.likes + h.comments + h.shares,
+        reverse=True,
+    )[:limit]
+
+    return HashtagAnalyticsResponse(
+        period={
+            "start": start_date.isoformat() if start_date else "",
+            "end": end_date.isoformat() if end_date else "",
+        },
+        hashtags=sorted_hashtags,
     )

@@ -108,6 +108,27 @@ services:
       - postiz-network
 
   # -------------------------------------------------------
+  # Metabase (analytics dashboard)
+  # -------------------------------------------------------
+  metabase:
+    image: metabase/metabase:latest
+    restart: always
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: ${POSTGRES_DB}
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${POSTGRES_USER}
+      MB_DB_PASS: ${POSTGRES_PASSWORD}
+      MB_DB_HOST: postgres
+    expose:
+      - 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - postiz-network
+
+  # -------------------------------------------------------
   # HTTPS reverse proxy (Tailscale certs)
   # -------------------------------------------------------
   nginx:
@@ -115,6 +136,7 @@ services:
     restart: always
     ports:
       - "3060:3060"
+      - "3070:3070"
       - "8443:8443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
@@ -122,6 +144,7 @@ services:
     depends_on:
       - postiz
       - collector
+      - metabase
     networks:
       - postiz-network
 

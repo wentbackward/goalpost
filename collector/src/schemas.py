@@ -30,6 +30,7 @@ class PostRegisterRequest(BaseModel):
     platform: str
     platform_post_id: str
     content_text: str | None = None
+    media_url: str | None = None
     media_type: str | None = None
     published_at: datetime | None = None
 
@@ -55,10 +56,12 @@ class PostResponse(BaseModel):
     platform: str
     platform_post_id: str
     content_text: str | None = None
+    media_url: str | None = None
     media_type: str | None = None
     published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+    hashtags: list[str] = []
     latest_metrics: MetricSnapshot | None = None
 
     model_config = {"from_attributes": True}
@@ -101,6 +104,25 @@ class AnalyticsSummaryResponse(BaseModel):
     by_platform: dict[str, PlatformTotals]
     by_media_type: dict[str, PlatformTotals]
     top_posts: list[TopPost]
+
+
+# --- Hashtag Analytics ---
+
+class HashtagTotals(BaseModel):
+    hashtag: str
+    posts: int = 0
+    impressions: int = 0
+    reach: int = 0
+    likes: int = 0
+    comments: int = 0
+    shares: int = 0
+    video_views: int = 0
+    engagement_rate: float = 0.0
+
+
+class HashtagAnalyticsResponse(BaseModel):
+    period: dict[str, str]
+    hashtags: list[HashtagTotals]
 
 
 # --- Health ---
