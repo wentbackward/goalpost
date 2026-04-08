@@ -1,6 +1,10 @@
 services:
+  # -------------------------------------------------------
+  # Shared infrastructure
+  # -------------------------------------------------------
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
+    restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -14,10 +18,12 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - social-analytics
+      - postiz-network
+      - temporal-network
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.2
+    restart: always
     volumes:
       - redisdata:/data
     healthcheck:
@@ -26,41 +32,162 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - social-analytics
+      - postiz-network
 
+  # -------------------------------------------------------
+  # Postiz
+  # -------------------------------------------------------
   postiz:
     image: ghcr.io/gitroomhq/postiz-app:latest
+    restart: always
     ports:
-      - "3000:3000"
+      - "3060:5000"
     environment:
+      MAIN_URL: ${MAIN_URL}
+      FRONTEND_URL: ${MAIN_URL}
+      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
+      BACKEND_INTERNAL_URL: "http://localhost:3000"
+      JWT_SECRET: ${JWT_SECRET}
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
-      JWT_SECRET: ${JWT_SECRET}
-      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
+      TEMPORAL_ADDRESS: "temporal:7233"
+      IS_GENERAL: "true"
+      DISABLE_REGISTRATION: "false"
+      RUN_CRON: "true"
+
+      # Storage
+      STORAGE_PROVIDER: "local"
+      UPLOAD_DIRECTORY: "/uploads"
+      NEXT_PUBLIC_UPLOAD_DIRECTORY: "/uploads"
+
+      # Social media API keys (passed from .env)
+      X_API_KEY: ${X_API_KEY:-}
+      X_API_SECRET: ${X_API_SECRET:-}
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
+      FACEBOOK_APP_ID: ${FACEBOOK_APP_ID:-}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET:-}
+      YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID:-}
+      YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET:-}
+      TIKTOK_CLIENT_ID: ${TIKTOK_CLIENT_ID:-}
+      TIKTOK_CLIENT_SECRET: ${TIKTOK_CLIENT_SECRET:-}
+      THREADS_APP_ID: ${THREADS_APP_ID:-}
+      THREADS_APP_SECRET: ${THREADS_APP_SECRET:-}
+      REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
+      REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
+
+      # Optional
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      NX_ADD_PLUGINS: "false"
+    volumes:
+      - postiz-config:/config/
+      - postiz-uploads:/uploads/
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks:
-      - social-analytics
+      - postiz-network
+      - temporal-network
 
+  # -------------------------------------------------------
+  # Analytics Collector
+  # -------------------------------------------------------
   collector:
     build: ./collector
+    restart: always
     ports:
-      - "8000:8000"
+      - "8060:8000"
     env_file:
       - .env
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - social-analytics
+      - postiz-network
+
+  # -------------------------------------------------------
+  # Temporal (required by Postiz for job scheduling)
+  # -------------------------------------------------------
+  temporal-elasticsearch:
+    image: elasticsearch:7.17.27
+    restart: always
+    environment:
+      - cluster.routing.allocation.disk.threshold_enabled=true
+      - cluster.routing.allocation.disk.watermark.low=512mb
+      - cluster.routing.allocation.disk.watermark.high=256mb
+      - cluster.routing.allocation.disk.watermark.flood_stage=128mb
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
+      - xpack.security.enabled=false
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    expose:
+      - 9200
+    networks:
+      - temporal-network
+
+  temporal-postgresql:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_USER: temporal
+    volumes:
+      - temporal-pgdata:/var/lib/postgresql/data
+    expose:
+      - 5432
+    networks:
+      - temporal-network
+
+  temporal:
+    image: temporalio/auto-setup:1.28.1
+    restart: always
+    ports:
+      - "7233:7233"
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - ENABLE_ES=true
+      - ES_SEEDS=temporal-elasticsearch
+      - ES_VERSION=v7
+      - TEMPORAL_NAMESPACE=default
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+    depends_on:
+      - temporal-postgresql
+      - temporal-elasticsearch
+    networks:
+      - temporal-network
+
+  temporal-ui:
+    image: temporalio/ui:2.34.0
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3060
+    depends_on:
+      - temporal
+    networks:
+      - temporal-network
 
 volumes:
   pgdata:
   redisdata:
+  postiz-config:
+  postiz-uploads:
+  esdata:
+  temporal-pgdata:
 
 networks:
-  social-analytics:
+  postiz-network:
+    driver: bridge
+  temporal-network:
     driver: bridge
