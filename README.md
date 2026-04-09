@@ -1,6 +1,8 @@
 # Goalpost — Social Media Analytics Platform
 
-A self-hosted Docker Compose recipe that pairs [Postiz](https://postiz.com) for multi-platform social scheduling with a custom **Analytics Collector** service. Post once, publish everywhere, track engagement across all channels.
+A self-hosted Docker Compose recipe that pairs [Postiz](https://postiz.com) for multi-platform social scheduling with a custom **Analytics Collector** service. Post once, publish everywhere, track engagement across all channels. Optionally, a bundled [Metabase](https://www.metabase.com/) instance gives you point-and-click dashboards — the hard part isn't the visualization, it's wrangling data out of five different platform APIs.
+
+You don't need to be a technical guru to get this running, but you *will* need your favourite AI coding agent riding shotgun. The real challenge is navigating each social platform's labyrinthine developer portal and OAuth setup — let the agent handle that for you.
 
 ## Features
 
