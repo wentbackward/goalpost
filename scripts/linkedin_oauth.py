@@ -12,7 +12,7 @@ import os
 
 CLIENT_ID = os.environ.get("LINKEDIN_CLIENT_ID", "")
 CLIENT_SECRET = os.environ.get("LINKEDIN_CLIENT_SECRET", "")
-REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://marvin.royal-armadillo.ts.net:9090/callback")
+REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://localhost:9090/callback")
 SCOPES = "openid profile email w_member_social"
 
 if not CLIENT_ID or not CLIENT_SECRET:
