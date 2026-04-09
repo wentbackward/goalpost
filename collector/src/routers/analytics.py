@@ -68,7 +68,10 @@ async def register_post(
     await session.refresh(post)
     await sync_post_hashtags(session, post)
     await session.commit()
-    await session.refresh(post)
+
+    # Re-fetch with hashtags eagerly loaded (async session can't lazy-load)
+    stmt = select(Post).where(Post.id == post.id).options(selectinload(Post.hashtags))
+    post = (await session.execute(stmt)).scalar_one()
     return _post_to_response(post)
 
 

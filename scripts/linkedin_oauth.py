@@ -4,6 +4,7 @@ Run this locally, open the URL it prints, authorize, and it captures the token.
 """
 
 import http.server
+import ssl
 import urllib.parse
 import webbrowser
 import sys
@@ -11,7 +12,7 @@ import os
 
 CLIENT_ID = os.environ.get("LINKEDIN_CLIENT_ID", "")
 CLIENT_SECRET = os.environ.get("LINKEDIN_CLIENT_SECRET", "")
-REDIRECT_URI = os.environ.get("REDIRECT_URI", "http://localhost:9090/callback")
+REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://marvin.royal-armadillo.ts.net:9090/callback")
 SCOPES = "openid profile email w_member_social"
 
 if not CLIENT_ID or not CLIENT_SECRET:
@@ -49,8 +50,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
-print("Waiting for callback on http://localhost:9090 ...")
+cert_dir = os.path.join(os.path.dirname(__file__), "..", "certs")
+certfile = os.path.join(cert_dir, "server.crt")
+keyfile = os.path.join(cert_dir, "server.key")
+
 server = http.server.HTTPServer(("0.0.0.0", 9090), Handler)
+if os.path.exists(certfile) and os.path.exists(keyfile):
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(certfile, keyfile)
+    server.socket = ctx.wrap_socket(server.socket, server_side=True)
+    print("Waiting for callback on https://0.0.0.0:9090 ...")
+else:
+    print("Warning: No TLS certs found, running plain HTTP")
+    print("Waiting for callback on http://0.0.0.0:9090 ...")
 server.handle_request()
 
 if not code:

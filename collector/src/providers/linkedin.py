@@ -1,5 +1,6 @@
 import asyncio
 from typing import Optional
+from urllib.parse import quote
 
 import httpx
 import structlog
@@ -67,32 +68,44 @@ class LinkedInProvider(BaseProvider):
         if not post_urn.startswith("urn:"):
             post_urn = f"urn:li:share:{post_urn}"
 
+        encoded_urn = quote(post_urn, safe="")
+
         async with httpx.AsyncClient(timeout=30) as client:
             await self._check_token_expiry(client)
 
             try:
-                # Get social metadata (likes, comments, shares) via socialMetadata
-                resp = await self._request_with_retry(
+                likes = 0
+                comments = 0
+                shares = 0
+                raw = {}
+
+                # Get likes count via socialActions
+                likes_resp = await self._request_with_retry(
                     client,
-                    f"{LINKEDIN_API_BASE}/v2/socialMetadata/{post_urn}",
+                    f"{LINKEDIN_API_BASE}/v2/socialActions/{encoded_urn}/likes",
+                    params={"count": 0},
                 )
+                if likes_resp.status_code == 200:
+                    likes_data = likes_resp.json()
+                    likes = likes_data.get("paging", {}).get("total", 0)
+                    raw["likes"] = likes_data
 
-                if resp.status_code == 401:
-                    raise ProviderError(
-                        self.platform, post_urn,
-                        "Access token expired. Refresh manually (60-day token).",
-                    )
+                # Get comments count via socialActions
+                comments_resp = await self._request_with_retry(
+                    client,
+                    f"{LINKEDIN_API_BASE}/v2/socialActions/{encoded_urn}/comments",
+                    params={"count": 0},
+                )
+                if comments_resp.status_code == 200:
+                    comments_data = comments_resp.json()
+                    comments = comments_data.get("paging", {}).get("total", 0)
+                    raw["comments"] = comments_data
 
-                if resp.status_code != 200:
-                    raise ProviderError(
-                        self.platform, post_urn,
-                        f"API returned {resp.status_code}: {resp.text[:200]}",
-                    )
-
-                data = resp.json()
-
-                # Also try organizational share statistics for impressions/clicks
-                stats = {}
+                # Try organizational share statistics for impressions/clicks
+                # (requires Community Management API — may 403)
+                impressions = None
+                clicks = None
+                reach = None
                 stats_resp = await self._request_with_retry(
                     client,
                     f"{LINKEDIN_API_BASE}/v2/organizationalEntityShareStatistics",
@@ -105,15 +118,33 @@ class LinkedInProvider(BaseProvider):
                     elements = stats_resp.json().get("elements", [])
                     if elements:
                         stats = elements[0].get("totalShareStatistics", {})
+                        impressions = stats.get("impressionCount")
+                        clicks = stats.get("clickCount")
+                        reach = stats.get("uniqueImpressionsCount")
+                        shares = stats.get("shareCount", shares)
+                        raw["shareStatistics"] = stats
+
+                # Check if we got anything at all
+                if likes_resp.status_code == 401 or comments_resp.status_code == 401:
+                    raise ProviderError(
+                        self.platform, post_urn,
+                        "Access token expired. Refresh manually (60-day token).",
+                    )
+
+                if likes_resp.status_code not in (200, 403) and comments_resp.status_code not in (200, 403):
+                    raise ProviderError(
+                        self.platform, post_urn,
+                        f"API returned likes={likes_resp.status_code} comments={comments_resp.status_code}",
+                    )
 
                 return {
-                    "impressions": stats.get("impressionCount"),
-                    "clicks": stats.get("clickCount"),
-                    "likes": data.get("likeCount") or stats.get("likeCount"),
-                    "comments": data.get("commentCount") or stats.get("commentCount"),
-                    "shares": data.get("shareCount") or stats.get("shareCount"),
-                    "reach": stats.get("uniqueImpressionsCount"),
-                    "raw": {"socialMetadata": data, "shareStatistics": stats},
+                    "impressions": impressions,
+                    "clicks": clicks,
+                    "likes": likes,
+                    "comments": comments,
+                    "shares": shares,
+                    "reach": reach,
+                    "raw": raw,
                 }
 
             except ProviderError:
