@@ -5,6 +5,7 @@ and discovers the Instagram Business Account ID.
 
 import http.server
 import os
+import ssl
 import urllib.parse
 import urllib.request
 import json
@@ -16,7 +17,7 @@ APP_SECRET = os.environ.get("META_APP_SECRET", "")
 if not APP_ID or not APP_SECRET:
     print("Set META_APP_ID and META_APP_SECRET environment variables")
     sys.exit(1)
-REDIRECT_URI = "http://localhost:9090/callback"
+REDIRECT_URI = os.environ.get("REDIRECT_URI", "http://localhost:9090/callback")
 SCOPES = "pages_show_list,pages_read_engagement,pages_read_user_content"
 
 auth_url = (
@@ -52,8 +53,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
-print("Waiting for callback on http://0.0.0.0:9090 ...")
+cert_dir = os.path.join(os.path.dirname(__file__), "..", "certs")
+certfile = os.path.join(cert_dir, "server.crt")
+keyfile = os.path.join(cert_dir, "server.key")
+
 server = http.server.HTTPServer(("0.0.0.0", 9090), Handler)
+if os.path.exists(certfile) and os.path.exists(keyfile):
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(certfile, keyfile)
+    server.socket = ctx.wrap_socket(server.socket, server_side=True)
+    print("Waiting for callback on https://0.0.0.0:9090 ...")
+else:
+    print("Waiting for callback on http://0.0.0.0:9090 ...")
 server.handle_request()
 
 if not code:
