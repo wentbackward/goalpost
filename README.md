@@ -2,8 +2,6 @@
 
 A self-hosted Docker Compose recipe that pairs [Postiz](https://postiz.com) for multi-platform social scheduling with a custom **Analytics Collector** service. Post once, publish everywhere, track engagement across all channels.
 
-**Copyright (c) 2026 Paul Gresham Advisory LLC — MIT License**
-
 ## Features
 
 - **Multi-platform posting** via Postiz — compose once, publish to X/Twitter, LinkedIn, Instagram, Facebook, YouTube, and more
