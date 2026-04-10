@@ -69,6 +69,7 @@ The assistant will read the documentation, understand the architecture, and guid
 - Docker Engine 24+ and Docker Compose v2
 - Platform developer accounts for each provider you want to track (see [Platform Credentials](#platform-credentials))
 - TLS certificates if you need HTTPS for OAuth callbacks (see [HTTPS Setup](#https-setup))
+- [Cloudflare R2](https://developers.cloudflare.com/r2/) bucket for media posting (free tier available) — see [Cloudflare R2](#cloudflare-r2-required-for-media-posting)
 
 ## Quick Start
 
@@ -139,6 +140,32 @@ Update `.env`:
 MAIN_URL=https://your-machine.your-tailnet.ts.net:3060
 NEXT_PUBLIC_BACKEND_URL=https://your-machine.your-tailnet.ts.net:3060/api
 ```
+
+> **Note:** If you plan to post media (images/video), you'll need [Cloudflare R2](#cloudflare-r2-required-for-media-posting) for public media hosting.
+
+### Cloudflare R2 (required for media posting)
+
+When posting images or video, social platform APIs (Instagram, X, etc.) need to **download the media from a publicly accessible URL**. Postiz has native support for [Cloudflare R2](https://developers.cloudflare.com/r2/) (S3-compatible object storage with a generous free tier).
+
+**Setup:**
+
+1. Create a [Cloudflare account](https://dash.cloudflare.com/sign-up) if you don't have one
+2. Go to **R2** in the sidebar and create a bucket (e.g. `social`)
+3. In bucket **Settings > Public access**, enable the **R2.dev subdomain** — note the public URL
+4. Go to **R2 > Manage R2 API Tokens** and create an **Account API Token** with Object Read & Write permissions
+5. Add these to your `.env`:
+
+```bash
+CLOUDFLARE_ACCOUNT_ID=your_account_id
+CLOUDFLARE_ACCESS_KEY=your_access_key_id
+CLOUDFLARE_SECRET_ACCESS_KEY=your_secret_access_key
+CLOUDFLARE_BUCKETNAME=social
+CLOUDFLARE_BUCKET_URL=https://pub-xxxxx.r2.dev
+```
+
+The `docker-compose.yml` is pre-configured to pass these through to Postiz. Uploaded media will be stored in R2 and served from the public URL, which social platforms can access without issues.
+
+**Text-only posts** work without R2 since Postiz sends the content directly via API. R2 is only needed when posts include images or video.
 
 ### Option 2: Let's Encrypt / Custom Certificates
 
