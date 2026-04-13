@@ -153,7 +153,22 @@ When posting images or video, social platform APIs (Instagram, X, etc.) need to 
 2. Go to **R2** in the sidebar and create a bucket (e.g. `social`)
 3. In bucket **Settings > Public access**, enable the **R2.dev subdomain** — note the public URL
 4. Go to **R2 > Manage R2 API Tokens** and create an **Account API Token** with Object Read & Write permissions
-5. Add these to your `.env`:
+5. In bucket **Settings > CORS Policy**, click **Add CORS policy** and paste the JSON below, replacing the origin with your Postiz URL (scheme + host + port must match exactly):
+
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://your-postiz-host:3060"],
+       "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+       "AllowedHeaders": ["*"],
+       "ExposeHeaders": ["ETag"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+
+   Without this, video and large-file uploads silently fail — Postiz uses S3 multipart uploads where the browser PUTs each chunk directly to R2, so the bucket must accept cross-origin requests from your Postiz origin. `ExposeHeaders: ["ETag"]` is required so Uppy can read each part's ETag to complete the upload.
+6. Add these to your `.env`:
 
 ```bash
 CLOUDFLARE_ACCOUNT_ID=your_account_id
